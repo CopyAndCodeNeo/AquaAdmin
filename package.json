@@ -1,0 +1,22 @@
+{
+  "name": "admin_web_project",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "cookie-parser": "^1.4.7",
+    "cookie-session": "^2.1.1",
+    "dotenv": "^17.3.1",
+    "express": "^4.19.2",
+    "firebase-admin": "^13.7.0",
+    "socket.io": "^4.8.3"
+  }
+}

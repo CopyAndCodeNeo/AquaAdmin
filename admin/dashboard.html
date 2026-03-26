@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaScan - Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
+</head>
+<body id="dashboard-page">
+    <div class="d-flex" id="wrapper">
+        <!-- Sidebar -->
+        <div class="bg-dark border-right" id="sidebar-wrapper">
+            <div class="sidebar-heading text-white">AquaScan Admin</div>
+            <div class="list-group list-group-flush">
+                <a href="dashboard.html" class="list-group-item list-group-item-action bg-dark text-white active">Dashboard</a>
+                <a href="scans.html" class="list-group-item list-group-item-action bg-dark text-white">Scan Records</a>
+                <a href="fishfreshness.html" class="list-group-item list-group-item-action bg-dark text-white">Fish Freshness</a>
+                <a href="dataset.html" class="list-group-item list-group-item-action bg-dark text-white">Image Dataset</a>
+                <a href="users.html" class="list-group-item list-group-item-action bg-dark text-white">Users</a>
+                <a href="training-data.html" class="list-group-item list-group-item-action bg-dark text-white">Model Training Data</a>
+                <a href="model-status.html" class="list-group-item list-group-item-action bg-dark text-white">Model Status</a>
+                <a href="analytics.html" class="list-group-item list-group-item-action bg-dark text-white">Analytics</a>
+                <a href="system-logs.html" class="list-group-item list-group-item-action bg-dark text-white">System Logs</a>
+                <a href="settings.html" class="list-group-item list-group-item-action bg-dark text-white">Settings</a>
+            </div>
+        </div>
+        <!-- /#sidebar-wrapper -->
+
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+                <div class="container-fluid">
+                    <button class="btn btn-primary" id="menu-toggle">Toggle Menu</button>
+                    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                        <ul class="navbar-nav ms-auto mt-2 mt-lg-0">
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" id="navbarDropdown" href="#" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <span id="admin-name"></span>
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                                    <a class="dropdown-item" href="settings.html">Settings</a>
+                                    <div class="dropdown-divider"></div>
+                                    <a class="dropdown-item" href="#" id="logout-btn-top">Logout</a>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="container-fluid px-4">
+                <h1 class="mt-4">Dashboard</h1>
+                <!-- Top Metrics Cards -->
+                <div class="row">
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="card text-white bg-info h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Dataset Size</h5>
+                                <p class="card-text fs-4" id="dataset-size">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="card text-white bg-primary h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Total Scans</h5>
+                                <p class="card-text fs-4" id="total-scans">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="card text-white h-100" style="background-color: #20c997;">
+                            <div class="card-body">
+                                <h5 class="card-title">Registered Users</h5>
+                                <p class="card-text fs-4" id="total-users">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="card text-dark bg-light h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Fish Freshness Identified</h5>
+                                <p class="card-text fs-4" id="fish-freshness-identified">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="card text-dark bg-light h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">New Scans Today</h5>
+                                <p class="card-text fs-4" id="new-scans-today">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Scan Uploads & Activity -->
+                <div class="row">
+                    <div class="col-lg-8 mb-4">
+                        <div class="card shadow-sm">
+                            <div class="card-header">Recent Scan Uploads</div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Scan ID</th>
+                                                <th>User</th>
+                                                <th>Species</th>
+                                                <th>Freshness</th>
+                                                <th>Confidence</th>
+                                                <th>Upload Date</th>
+                                                <th>Image</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="recent-scans-body">
+                                            <!-- Dynamic content will be loaded here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 mb-4">
+                        <div class="card shadow-sm">
+                            <div class="card-header">Recent Activity Feed</div>
+                            <div class="card-body">
+                                <ul class="list-group list-group-flush" id="recent-activity-list">
+                                    <!-- Dynamic content will be loaded here -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top Contributors -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card shadow-sm">
+                            <div class="card-header">Top Contributors</div>
+                            <div class="card-body">
+                                <ul class="list-group list-group-flush" id="top-contributors-list">
+                                    <!-- Dynamic content will be loaded here -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- /#page-content-wrapper -->
+    </div>
+    <!-- /#wrapper -->
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/dashboard.js"></script>
+</body>
+</html>

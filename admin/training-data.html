@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaScan - Training Data</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
+</head>
+<body id="training-data-page">
+    <div class="d-flex" id="wrapper">
+        <!-- Sidebar -->
+        <div class="bg-dark border-right" id="sidebar-wrapper">
+            <div class="sidebar-heading text-white">AquaScan Admin</div>
+            <div class="list-group list-group-flush">
+                <a href="dashboard.html" class="list-group-item list-group-item-action bg-dark text-white">Dashboard</a>
+                <a href="scans.html" class="list-group-item list-group-item-action bg-dark text-white">Scan Records</a>
+                <a href="fishfreshness.html" class="list-group-item list-group-item-action bg-dark text-white">Fish Freshness</a>
+                <a href="dataset.html" class="list-group-item list-group-item-action bg-dark text-white">Image Dataset</a>
+                <a href="users.html" class="list-group-item list-group-item-action bg-dark text-white">Users</a>
+                <a href="training-data.html" class="list-group-item list-group-item-action bg-dark text-white active">Model Training Data</a>
+                <a href="model-status.html" class="list-group-item list-group-item-action bg-dark text-white">Model Status</a>
+                <a href="analytics.html" class="list-group-item list-group-item-action bg-dark text-white">Analytics</a>
+                <a href="settings.html" class="list-group-item list-group-item-action bg-dark text-white">Settings</a>
+            </div>
+        </div>
+        <!-- /#sidebar-wrapper -->
+
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+                <div class="container-fluid">
+                    <button class="btn btn-primary" id="menu-toggle">Toggle Menu</button>
+                    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                        <ul class="navbar-nav ms-auto mt-2 mt-lg-0">
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" id="navbarDropdown" href="#" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <span id="admin-name"></span>
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                                    <a class="dropdown-item" href="settings.html">Settings</a>
+                                    <div class="dropdown-divider"></div>
+                                    <a class="dropdown-item" href="#" id="logout-btn-top">Logout</a>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="container-fluid px-4">
+                <h1 class="mt-4">Model Training Data</h1>
+
+                <!-- Summary Cards -->
+                <div class="row">
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Eye Images</h5>
+                                <p class="card-text fs-4" id="eye-image-count">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Gill Images</h5>
+                                <p class="card-text fs-4" id="gill-image-count">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Full Fish Images</h5>
+                                <p class="card-text fs-4" id="full-fish-image-count">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Total Training Images</h5>
+                                <p class="card-text fs-4" id="total-training-images">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card shadow-sm">
+                            <div class="card-body">
+                                <h5 class="card-title">Species Count</h5>
+                                <p class="card-text fs-4" id="species-count">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card shadow-sm">
+                            <div class="card-body">
+                                <h5 class="card-title">New Items (24h)</h5>
+                                <p class="card-text fs-4" id="new-items-24h">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Grouped Data -->
+                <div id="training-data-container"></div>
+
+            </div>
+        </div>
+        <!-- /#page-content-wrapper -->
+    </div>
+    <!-- /#wrapper -->
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/training-data.js"></script>
+</body>
+</html>
