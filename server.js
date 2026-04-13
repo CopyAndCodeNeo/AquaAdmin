@@ -249,6 +249,7 @@ app.use('/api', checkApiAuth);
 ------------------------------*/
 const getTrainingDataStats = async () => {
     const trainingDataSnap = await db.collection("trainingData").get();
+
     let eyeCount = 0;
     let gillCount = 0;
     let fullFishCount = 0;
@@ -268,31 +269,104 @@ const getTrainingDataStats = async () => {
     };
 };
 
-const getDashboardStats = async () => {
-    const scansSnap = await db.collection("scans").get();
-    const usersSnap = await db.collection("users").get();
-    const trainingDataSnap = await db.collection("trainingData").get();
+const getScansQuery = () => db.collectionGroup('scans');
 
-    let freshCount = 0;
-    let notFreshCount = 0;
+const normalizeFreshness = (value) => {
+    if (!value || typeof value !== 'string') return null;
+
+    const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, '_');
+    if (normalized === 'fresh') return 'fresh';
+    if (['not_fresh', 'notfresh', 'stale', 'spoiled'].includes(normalized)) return 'not_fresh';
+
+    return normalized;
+};
+
+const getUploadDateMillis = (scan) => {
+    const dateLike = scan.uploadDate || scan.createdAt || scan.timestamp || null;
+
+    if (!dateLike) return 0;
+    if (typeof dateLike.toMillis === 'function') return dateLike.toMillis();
+    if (typeof dateLike.toDate === 'function') return dateLike.toDate().getTime();
+    if (dateLike instanceof Date) return dateLike.getTime();
+    if (typeof dateLike === 'number') return dateLike > 1e12 ? dateLike : dateLike * 1000;
+
+    const parsed = Date.parse(dateLike);
+    return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const normalizeScanDoc = (doc, usersById = new Map()) => {
+    const raw = doc.data();
+    const userId = raw.userId || raw.uid || raw.userUID || null;
+    const linkedUser = userId ? usersById.get(userId) : null;
+
+    const userName =
+        raw.userName ||
+        raw.username ||
+        linkedUser?.name ||
+        linkedUser?.displayName ||
+        (userId ? `Unknown (${userId})` : 'Missing userId');
+
+    const species = raw.species || raw.fishSpecies || raw.predictedSpecies || 'Missing species';
+    const freshness = normalizeFreshness(raw.freshness || raw.freshnessLabel || raw.resultLabel) || 'unknown';
+    const confidenceRaw = raw.confidence ?? raw.freshnessConfidence ?? raw.score ?? null;
+    const confidence = typeof confidenceRaw === 'number' ? confidenceRaw : Number(confidenceRaw) || null;
+
+    return {
+        ...raw,
+        id: doc.id,
+        userId,
+        userName,
+        species,
+        freshness,
+        confidence,
+        uploadDate: raw.uploadDate || raw.createdAt || raw.timestamp || null,
+        imageUrl: raw.imageUrl || raw.imageURL || raw.photoUrl || null,
+        status: raw.status || (freshness !== 'unknown' ? 'Verified' : 'Missing freshness'),
+    };
+};
+
+const getNormalizedScans = async (usersById = new Map()) => {
+    const scansSnap = await getScansQuery().get();
+    return scansSnap.docs.map((doc) => normalizeScanDoc(doc, usersById));
+};
+
+const buildActivityItem = (scan) => {
+    const uploadMillis = getUploadDateMillis(scan);
+    const timestampLabel = uploadMillis ? new Date(uploadMillis).toLocaleString() : 'Unknown time';
+    const actor = scan.userName || (scan.userId ? `Unknown (${scan.userId})` : 'Missing userId');
+    const species = scan.species || 'Missing species';
+
+    return {
+        message: `[${timestampLabel}] ${actor} uploaded a scan of ${species}.`,
+        timestamp: uploadMillis ? new Date(uploadMillis) : null,
+    };
+};
+
+const getDashboardStats = async () => {
+    const usersSnap = await db.collection("users").get();
+    const scans = await getNormalizedScans();
+
+    let freshnessIdentified = 0;
     let newScansToday = 0;
     const today = new Date().toDateString();
 
-    scansSnap.forEach(doc => {
-        const d = doc.data();
-        if (d.freshness === "fresh") freshCount++;
-        if (d.freshness === "not_fresh") notFreshCount++;
-        if (d.uploadDate && d.uploadDate.toDate && d.uploadDate.toDate().toDateString() === today) {
+    scans.forEach((scan) => {
+        if (scan.freshness === 'fresh' || scan.freshness === 'not_fresh') {
+            freshnessIdentified++;
+        }
+
+        const uploadMillis = getUploadDateMillis(scan);
+        if (uploadMillis && new Date(uploadMillis).toDateString() === today) {
             newScansToday++;
         }
     });
 
     return {
-        totalScans: scansSnap.size,
+        totalScans: scans.length,
         totalUsers: usersSnap.size,
-        fishFreshnessIdentified: freshCount + notFreshCount,
+        fishFreshnessIdentified: freshnessIdentified,
         newScansToday,
-        datasetSize: trainingDataSnap.size
+        datasetSize: scans.length
     };
 };
 
@@ -310,8 +384,14 @@ app.get("/api/dashboard-stats", async (req, res) => {
 
 app.get("/api/recent-scans", async (req, res) => {
     try {
-        const scansSnap = await db.collection("scans").orderBy("uploadDate", "desc").limit(10).get();
-        const recentScans = scansSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const usersSnap = await db.collection('users').get();
+        const usersById = new Map(usersSnap.docs.map((doc) => [doc.id, doc.data()]));
+        const scans = await getNormalizedScans(usersById);
+
+        const recentScans = scans
+            .sort((a, b) => getUploadDateMillis(b) - getUploadDateMillis(a))
+            .slice(0, 10);
+
         res.json(recentScans);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -320,8 +400,15 @@ app.get("/api/recent-scans", async (req, res) => {
 
 app.get("/api/activity-feed", async (req, res) => {
     try {
-        const feedSnap = await db.collection("activity_logs").orderBy("timestamp", "desc").limit(10).get();
-        const activityFeed = feedSnap.docs.map(doc => doc.data());
+        const usersSnap = await db.collection('users').get();
+        const usersById = new Map(usersSnap.docs.map((doc) => [doc.id, doc.data()]));
+        const scans = await getNormalizedScans(usersById);
+
+        const activityFeed = scans
+            .sort((a, b) => getUploadDateMillis(b) - getUploadDateMillis(a))
+            .slice(0, 10)
+            .map(buildActivityItem);
+
         res.json(activityFeed);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -330,14 +417,20 @@ app.get("/api/activity-feed", async (req, res) => {
 
 app.get("/api/dataset-growth", async (req, res) => {
     try {
-        const scansSnap = await db.collection('scans').orderBy('uploadDate', 'asc').get();
-        const growthData = scansSnap.docs.reduce((acc, doc) => {
-            const date = doc.data().uploadDate.toDate().toISOString().split('T')[0];
+        const scans = await getNormalizedScans();
+        const growthData = scans.reduce((acc, scan) => {
+            const uploadMillis = getUploadDateMillis(scan);
+            if (!uploadMillis) return acc;
+
+            const date = new Date(uploadMillis).toISOString().split('T')[0];
             acc[date] = (acc[date] || 0) + 1;
             return acc;
         }, {});
 
-        const cumulativeData = Object.keys(growthData).map(date => ({ date, count: growthData[date] }));
+        const cumulativeData = Object.keys(growthData)
+            .sort((a, b) => Date.parse(a) - Date.parse(b))
+            .map((date) => ({ date, count: growthData[date] }));
+
         res.json(cumulativeData);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -349,32 +442,53 @@ app.get("/api/dataset-growth", async (req, res) => {
 ------------------------------*/
 app.get("/api/scans", async (req, res) => {
   try {
-    let query = db.collection("scans");
+    const usersSnap = await db.collection('users').get();
+    const usersById = new Map(usersSnap.docs.map((doc) => [doc.id, doc.data()]));
+    let scans = await getNormalizedScans(usersById);
 
-    // Filtering
-    if (req.query.user) query = query.where('userName', '==', req.query.user);
-    if (req.query.species) query = query.where('species', '==', req.query.species);
-    if (req.query.freshness) query = query.where('freshness', '==', req.query.freshness);
-    if (req.query.startDate) query = query.where('uploadDate', '>=', new Date(req.query.startDate));
-    if (req.query.endDate) query = query.where('uploadDate', '<=', new Date(req.query.endDate));
+    if (req.query.user) {
+      scans = scans.filter((scan) => scan.userName === req.query.user);
+    }
 
-    // Sorting
-    const sortBy = req.query.sortBy || 'uploadDate';
-    const sortOrder = req.query.sortOrder || 'desc';
-    query = query.orderBy(sortBy, sortOrder);
+    if (req.query.species) {
+      scans = scans.filter((scan) => scan.species === req.query.species);
+    }
 
-    // Pagination
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    if (req.query.freshness) {
+      const freshnessSet = new Set(
+        req.query.freshness
+          .split(',')
+          .map((value) => normalizeFreshness(value))
+          .filter(Boolean)
+      );
+      scans = scans.filter((scan) => freshnessSet.has(scan.freshness));
+    }
+
+    if (req.query.startDate) {
+      const startMillis = Date.parse(req.query.startDate);
+      if (!Number.isNaN(startMillis)) {
+        scans = scans.filter((scan) => getUploadDateMillis(scan) >= startMillis);
+      }
+    }
+
+    if (req.query.endDate) {
+      const endMillis = Date.parse(req.query.endDate);
+      if (!Number.isNaN(endMillis)) {
+        scans = scans.filter((scan) => getUploadDateMillis(scan) <= endMillis);
+      }
+    }
+
+    const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
+    scans.sort((a, b) => {
+      const diff = getUploadDateMillis(a) - getUploadDateMillis(b);
+      return sortOrder === 'asc' ? diff : -diff;
+    });
+
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
     const offset = (page - 1) * limit;
-    
-    const snapshot = await query.offset(offset).limit(limit).get();
-    const total = (await query.get()).size;
-
-    const scans = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    const total = scans.length;
+    scans = scans.slice(offset, offset + limit);
 
     res.json({ 
       scans, 
@@ -393,7 +507,7 @@ app.get("/api/scans", async (req, res) => {
 app.get("/api/users", async (req, res) => {
   try {
     const usersSnap = await db.collection('users').get();
-    const scansSnap = await db.collection('scans').get();
+    const scansSnap = await getScansQuery().get();
 
     const scansPerUser = {};
     scansSnap.forEach(doc => {
@@ -421,50 +535,24 @@ app.get("/api/users", async (req, res) => {
 });
 
 /* -----------------------------
-   DELETE USER
-------------------------------*/
-app.delete("/api/users/:id", async (req, res) => {
-  try {
-    await admin.auth().deleteUser(req.params.id);
-    await db.collection('users').doc(req.params.id).delete();
-    res.status(200).send({ message: 'User deleted successfully' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.put("/api/users/:id/profile", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, email } = req.body;
-
-    await admin.auth().updateUser(id, { email, displayName: name });
-    await db.collection('users').doc(id).update({ name, email });
-
-    res.status(200).send({ message: 'Profile updated successfully' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/* -----------------------------
    DATASET SUMMARY
 ------------------------------*/
 app.get("/api/dataset-summary", async (req, res) => {
   try {
-    const scansSnap = await db.collection("scans").get();
-    const twentyFourHoursAgo = admin.firestore.Timestamp.now().toMillis() - (24 * 60 * 60 * 1000);
+    const scans = await getNormalizedScans();
+    const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
 
     let newImages = 0;
-    scansSnap.forEach(doc => {
-      if (doc.data().uploadDate.toMillis() > twentyFourHoursAgo) {
+    scans.forEach((scan) => {
+      if (getUploadDateMillis(scan) > twentyFourHoursAgo) {
         newImages++;
       }
     });
 
     res.json({
-      totalTrainingImages: scansSnap.size,
+      totalTrainingImages: scans.length,
       newImagesAdded: newImages,
+      datasetSource: 'scans',
       modelAccuracy: "N/A" // Placeholder
     });
   } catch (err) {
@@ -477,13 +565,15 @@ app.get("/api/dataset-summary", async (req, res) => {
 ------------------------------*/
 app.get("/api/recent-activity", async (req, res) => {
   try {
-    const scansSnap = await db.collection("scans").orderBy("uploadDate", "desc").limit(10).get();
-    const activities = scansSnap.docs.map(doc => {
-      const scan = doc.data();
-      const userName = scan.userName || "Unknown User";
-      const timestamp = new Date(scan.uploadDate.toMillis()).toLocaleString();
-      return `[${timestamp}] ${userName} uploaded a scan of a ${scan.species || 'fish'}.`;
-    });
+    const usersSnap = await db.collection('users').get();
+    const usersById = new Map(usersSnap.docs.map((doc) => [doc.id, doc.data()]));
+    const scans = await getNormalizedScans(usersById);
+
+    const activities = scans
+      .sort((a, b) => getUploadDateMillis(b) - getUploadDateMillis(a))
+      .slice(0, 10)
+      .map((scan) => buildActivityItem(scan).message);
+
     res.json(activities);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -495,26 +585,35 @@ app.get("/api/recent-activity", async (req, res) => {
 ------------------------------*/
 app.get("/api/top-contributors", async (req, res) => {
   try {
-    const scansSnap = await db.collection("scans").get();
-    const userCounts = {};
+    const usersSnap = await db.collection('users').get();
+    const usersById = new Map(usersSnap.docs.map((doc) => [doc.id, doc.data()]));
+    const scans = await getNormalizedScans(usersById);
+    const contributorMap = new Map();
 
-    scansSnap.forEach(doc => {
-      const scan = doc.data();
-      if (scan.userId) {
-        userCounts[scan.userId] = (userCounts[scan.userId] || 0) + 1;
+    scans.forEach((scan) => {
+      const key = scan.userId || '__missing_user_id__';
+      const existing = contributorMap.get(key) || { count: 0, fallbackName: null };
+      existing.count += 1;
+      if (!existing.fallbackName && scan.userName) {
+        existing.fallbackName = scan.userName;
       }
+      contributorMap.set(key, existing);
     });
 
-    const sortedUserIds = Object.entries(userCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([userId, count]) => ({ userId, count }));
+    const contributors = Array.from(contributorMap.entries())
+      .map(([userId, value]) => {
+        if (userId === '__missing_user_id__') {
+          return { name: 'Missing userId', count: value.count };
+        }
 
-    const contributors = await Promise.all(sortedUserIds.map(async (item) => {
-      const userDoc = await db.collection('users').doc(item.userId).get();
-      const userName = userDoc.exists ? userDoc.data().name : 'Unknown User';
-      return { name: userName, count: item.count };
-    }));
+        const user = usersById.get(userId);
+        return {
+          name: user?.name || user?.displayName || value.fallbackName || `Unknown (${userId})`,
+          count: value.count,
+        };
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
 
     res.json(contributors);
   } catch (err) {
@@ -527,14 +626,15 @@ app.get("/api/top-contributors", async (req, res) => {
 ------------------------------*/
 app.get("/api/fishfreshness", async (req, res) => {
   try {
-    const scansSnap = await db.collection('scans').get();
+    const scans = await getNormalizedScans();
     let freshCount = 0;
     let notFreshCount = 0;
-    scansSnap.forEach(doc => {
-      const scan = doc.data();
+
+    scans.forEach((scan) => {
       if (scan.freshness === 'fresh') freshCount++;
       if (scan.freshness === 'not_fresh') notFreshCount++;
     });
+
     res.json({ freshCount, notFreshCount });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -688,10 +788,20 @@ app.get("/api/system-logs", async (req, res) => {
 // =================================================================
 const setupFirestoreListeners = (io) => {
     // Scans listener
-    db.collection('scans').onSnapshot(snapshot => {
+    getScansQuery().onSnapshot(snapshot => {
         snapshot.docChanges().forEach(async (change) => {
             if (change.type === 'added') {
-                const newScan = { id: change.doc.id, ...change.doc.data() };
+                const raw = change.doc.data();
+                const usersById = new Map();
+
+                if (raw.userId) {
+                    const userDoc = await db.collection('users').doc(raw.userId).get();
+                    if (userDoc.exists) {
+                        usersById.set(raw.userId, userDoc.data());
+                    }
+                }
+
+                const newScan = normalizeScanDoc(change.doc, usersById);
                 
                 // Emit new scan for live table
                 io.emit('new-scan', newScan);
@@ -701,10 +811,7 @@ const setupFirestoreListeners = (io) => {
                 io.emit('dashboard-stats-update', stats);
 
                 // Create and emit activity feed event
-                const activity = {
-                    message: `${newScan.userName || 'Unknown User'} uploaded a scan of a ${newScan.species || 'fish'}`,
-                    timestamp: new Date()
-                };
+                const activity = buildActivityItem(newScan);
                 await db.collection('activity_logs').add(activity);
                 io.emit('new-activity', activity);
             }
