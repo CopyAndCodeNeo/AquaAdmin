@@ -22,21 +22,15 @@ async function completeLogin(idToken) {
             credentials: 'same-origin'
         });
 
-        console.log('Login debug: /api/auth/login status =', response.status);
-
         const payload = await response.json().catch(() => ({}));
-        console.log('Login debug: /api/auth/login payload =', payload);
 
         if (response.ok) {
-            const sessionProbe = await fetch('/api/auth/status', { credentials: 'same-origin' });
-            console.log('Login debug: /api/auth/status after login =', sessionProbe.status);
             window.location.href = '/admin/dashboard.html';
         } else {
             errorElement.innerText = payload.message || 'Admin verification failed.';
             errorElement.style.display = 'block';
         }
     } catch (error) {
-        console.error('Login debug: completeLogin exception =', error);
         errorElement.innerText = 'An error occurred during login. Please try again.';
         errorElement.style.display = 'block';
     }
