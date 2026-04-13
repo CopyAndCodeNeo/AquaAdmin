@@ -14,6 +14,10 @@ const server = http.createServer(app);
 const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 
+if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);
+}
+
 const parseServiceAccountFromEnv = (rawValue) => {
     if (!rawValue || typeof rawValue !== 'string') {
         throw new Error('FIREBASE_SERVICE_ACCOUNT is empty or not a string.');
