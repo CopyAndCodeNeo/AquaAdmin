@@ -28,6 +28,10 @@ function initializePage(user) {
 
     const menuToggle = document.getElementById("menu-toggle");
     if (menuToggle) {
+        menuToggle.textContent = '☰';
+        menuToggle.setAttribute('aria-label', 'Toggle menu');
+        menuToggle.setAttribute('title', 'Toggle menu');
+
         menuToggle.addEventListener("click", () => {
             document.getElementById("wrapper").classList.toggle("toggled");
         });
