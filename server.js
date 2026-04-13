@@ -6,72 +6,193 @@ const { Server } = require("socket.io");
 const admin = require("firebase-admin");
 const cookieParser = require("cookie-parser");
 const cookieSession = require("cookie-session");
+const helmet = require("helmet");
+const cors = require("cors");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
-app.use(cookieSession({
-    name: 'session',
-    keys: [process.env.SESSION_KEY || 'default_secret_key_for_dev'],
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-}));
+const parseServiceAccountFromEnv = (rawValue) => {
+    if (!rawValue || typeof rawValue !== 'string') {
+        throw new Error('FIREBASE_SERVICE_ACCOUNT is empty or not a string.');
+    }
 
-/* -----------------------------
-   FIREBASE ADMIN SDK
-------------------------------*/
-// Use environment variable in production for security, fallback to local file for development
-const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
-  ? JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT, 'base64').toString('ascii'))
-  : require('./config/firebaseServiceAccount.json');
+    const trimmed = rawValue.trim();
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+    const tryParseJson = (value) => {
+        const parsed = JSON.parse(value);
+        if (parsed && parsed.private_key) {
+            parsed.private_key = parsed.private_key.replace(/\\n/g, '\n');
+        }
+        return parsed;
+    };
 
-const db = admin.firestore();
-
-/* -----------------------------
-   STATIC FILES & AUTH MIDDLEWARE
-------------------------------*/
-const checkAuth = (req, res, next) => {
-    if (req.session.user) {
-        next();
-    } else {
-        res.redirect('/');
+    try {
+        return tryParseJson(trimmed);
+    } catch (_) {
+        const decoded = Buffer.from(trimmed, 'base64').toString('utf8').trim();
+        return tryParseJson(decoded);
     }
 };
 
-// Public routes
+// =================================================================
+//                      FIREBASE ADMIN SDK SETUP
+// =================================================================
+// This block handles Firebase initialization safely for both production and development.
+if (!admin.apps.length) {
+    console.log('Firebase: Initializing Admin SDK...');
+    let serviceAccount;
+
+    // In production (e.g., Render), use the raw JSON from the environment variable.
+    if (process.env.NODE_ENV === 'production' && process.env.FIREBASE_SERVICE_ACCOUNT) {
+        console.log('Firebase: Using ENV service account in production.');
+        try {
+            serviceAccount = parseServiceAccountFromEnv(process.env.FIREBASE_SERVICE_ACCOUNT);
+            console.log('Firebase: Parsed service account from environment variable successfully.');
+        } catch (error) {
+            console.error('Firebase Error: Failed to parse FIREBASE_SERVICE_ACCOUNT. Provide either raw JSON or Base64-encoded JSON.', error);
+        }
+    } else {
+        // For local development, fall back to the local JSON file.
+        console.log('Firebase: Using local service account file in development.');
+        try {
+            serviceAccount = require('./config/firebaseServiceAccount.json');
+            console.log('Firebase: Loaded service account from local file.');
+        } catch (error) {
+            console.error('Firebase Error: Could not find or read local service account file at ./config/firebaseServiceAccount.json.', error);
+        }
+    }
+
+    if (serviceAccount) {
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+        });
+        console.log('Firebase: Admin SDK initialized successfully.');
+    } else {
+        console.error('Firebase Critical Error: Service account not found. Firebase Admin SDK could not be initialized.');
+    }
+} else {
+    console.log('Firebase: Admin SDK already initialized.');
+}
+
+const db = admin.firestore();
+
+// =================================================================
+//                      MIDDLEWARE SETUP
+// =================================================================
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+app.use(helmet());
+app.use(cors());
+
+const isProduction = process.env.NODE_ENV === 'production';
+app.use(cookieSession({
+    name: 'session',
+    keys: [process.env.SESSION_KEY || 'default_secret_key_for_dev'],
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    secure: isProduction, // Use secure cookies in production
+    httpOnly: true,
+}));
+
+// =================================================================
+//                      AUTHENTICATION MIDDLEWARE
+// =================================================================
+const checkUiAuth = (req, res, next) => {
+    const allowedRoles = ['admin', 'super_admin'];
+    if (!req.session || !req.session.user) {
+        console.log('UI Auth Middleware: No session found. Redirecting to login.');
+        return res.redirect('/');
+    }
+
+    const user = req.session.user;
+    if (!user.role || !allowedRoles.includes(user.role)) {
+        console.log(`UI Auth Middleware: User ${user.name} with role '${user.role}' has invalid role. Clearing session and redirecting.`);
+        req.session = null;
+        return res.redirect('/');
+    }
+
+    console.log(`UI Auth Middleware: User ${user.name} with role '${user.role}' granted access to ${req.originalUrl}.`);
+    next();
+};
+
+const checkApiAuth = (req, res, next) => {
+    const allowedRoles = ['admin', 'super_admin'];
+    if (!req.session || !req.session.user) {
+        console.log('API Auth Middleware: No session found for API request.');
+        return res.status(401).json({ message: 'Unauthorized: No active session.' });
+    }
+
+    const user = req.session.user;
+    if (!user.role || !allowedRoles.includes(user.role)) {
+        console.log(`API Auth Middleware: User ${user.name} with role '${user.role}' attempted to access a protected API route.`);
+        return res.status(403).json({ message: `Forbidden: Role '${user.role}' is not authorized.` });
+    }
+
+    console.log(`API Auth Middleware: User ${user.name} with role '${user.role}' granted access to ${req.originalUrl}.`);
+    next();
+};
+
+// =================================================================
+//                      STATIC FILE SERVING
+// =================================================================
+// Publicly accessible login page
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Protected admin routes
-app.use("/admin", checkAuth, express.static(path.join(__dirname, "admin")));
+// Protected admin panel
+app.use("/admin", checkUiAuth, express.static(path.join(__dirname, "admin")));
 
-/* -----------------------------
-   AUTH API
-------------------------------*/
+// =================================================================
+//                      AUTHENTICATION API ROUTES
+// =================================================================
 app.post('/api/auth/login', async (req, res) => {
+    console.log('Auth: Login endpoint hit.');
     try {
         const { idToken } = req.body;
-        const decodedToken = await admin.auth().verifyIdToken(idToken);
-        const userDoc = await db.collection('users').doc(decodedToken.uid).get();
-
-        if (!userDoc.exists || (userDoc.data().role !== 'admin' && userDoc.data().role !== 'super_admin')) {
-            return res.status(403).json({ message: 'Forbidden: Not an admin.' });
+        if (!idToken) {
+            console.error('Auth Error: No ID token provided.');
+            return res.status(400).json({ message: 'ID token is required.' });
         }
 
-        req.session.user = { uid: decodedToken.uid, name: userDoc.data().name, email: userDoc.data().email };
-        res.status(200).json({ message: 'Login successful' });
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        console.log('Auth: Token verified for UID:', decodedToken.uid);
+
+        const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+
+        if (!userDoc.exists) {
+            console.error(`Auth Error: Firestore document not found for UID: ${decodedToken.uid}`);
+            return res.status(403).json({ message: 'Forbidden: User record not found.' });
+        }
+
+        const userData = userDoc.data();
+        console.log('Auth: User data retrieved from Firestore:', JSON.stringify(userData, null, 2));
+
+        const userRole = userData.role;
+        console.log(`Auth: Validating user role: '${userRole}'`);
+
+        if (!userRole) {
+            console.error(`Auth Error: Role field is missing for user ${decodedToken.uid}.`);
+            return res.status(403).json({ message: 'Forbidden: Role is missing.' });
+        }
+
+        const allowedRoles = ['admin', 'super_admin'];
+        if (!allowedRoles.includes(userRole)) {
+            console.error(`Auth Error: User ${decodedToken.uid} has an invalid role: '${userRole}'`);
+            return res.status(403).json({ message: `Forbidden: Role '${userRole}' is not authorized.` });
+        }
+
+        console.log(`Auth Success: User '${userData.name}' (${decodedToken.uid}) logged in with role '${userRole}'.`);
+        req.session.user = { uid: decodedToken.uid, name: userData.name, email: userData.email, role: userRole };
+        res.status(200).json({ message: 'Login successful', user: req.session.user });
+
     } catch (error) {
-        res.status(401).json({ message: 'Unauthorized' });
+        console.error('Auth Critical Error:', error);
+        res.status(401).json({ message: 'Unauthorized: Invalid token or server error.' });
     }
 });
 
@@ -88,8 +209,16 @@ app.post('/api/auth/logout', (req, res) => {
     res.status(200).json({ message: 'Logout successful' });
 });
 
-// Protect all other API routes
-app.use('/api', checkAuth);
+// Protect all subsequent API routes
+app.use('/api', checkApiAuth);
+
+// =================================================================
+//                      API ENDPOINTS
+// =================================================================
+
+// ... (All your other API endpoints like /api/dashboard-stats, /api/scans, etc., remain here)
+// NOTE: I have omitted the full API endpoint code for brevity, but it is included in the final file.
+// The structure below shows where they fit.
 
 /* -----------------------------
    DASHBOARD & REAL-TIME HELPERS
@@ -529,9 +658,10 @@ app.get("/api/system-logs", async (req, res) => {
   }
 });
 
-/* -----------------------------
-   SOCKET.IO & REAL-TIME LISTENERS
-------------------------------*/
+
+// =================================================================
+//                      SOCKET.IO & REAL-TIME LISTENERS
+// =================================================================
 const setupFirestoreListeners = (io) => {
     // Scans listener
     db.collection('scans').onSnapshot(snapshot => {
@@ -583,18 +713,21 @@ const setupFirestoreListeners = (io) => {
         });
     });
 };
-  setupFirestoreListeners(io);
+
+if (db) {
+    setupFirestoreListeners(io);
+}
 
 io.on('connection', (socket) => {
-  console.log('A user connected');
+  console.log('Socket.IO: A user connected');
   socket.on('disconnect', () => {
-    console.log('User disconnected');
+    console.log('Socket.IO: User disconnected');
   });
 });
 
-/* -----------------------------
-   SERVER
-------------------------------*/
+// =================================================================
+//                      SERVER START
+// =================================================================
 server.listen(PORT, () => {
   console.log(`AquaScan Admin running at http://localhost:${PORT}`);
 });
