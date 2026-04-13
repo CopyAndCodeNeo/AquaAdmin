@@ -85,7 +85,26 @@ const db = admin.firestore();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(helmet());
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            scriptSrc: ["'self'", 'https://www.gstatic.com', 'https://cdn.jsdelivr.net'],
+            styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+            connectSrc: [
+                "'self'",
+                'https://www.googleapis.com',
+                'https://www.gstatic.com',
+                'https://identitytoolkit.googleapis.com',
+                'https://securetoken.googleapis.com',
+            ],
+            imgSrc: ["'self'", 'data:', 'https:'],
+            fontSrc: ["'self'", 'https://cdn.jsdelivr.net', 'data:'],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            frameAncestors: ["'self'"],
+        },
+    },
+}));
 app.use(cors());
 
 const isProduction = process.env.NODE_ENV === 'production';
