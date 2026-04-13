@@ -96,6 +96,7 @@ app.use(helmet({
                 'https://www.gstatic.com',
                 'https://identitytoolkit.googleapis.com',
                 'https://securetoken.googleapis.com',
+                'https://cdn.jsdelivr.net',
             ],
             imgSrc: ["'self'", 'data:', 'https:'],
             fontSrc: ["'self'", 'https://cdn.jsdelivr.net', 'data:'],
