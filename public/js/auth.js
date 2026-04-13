@@ -18,18 +18,25 @@ async function completeLogin(idToken) {
         const response = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ idToken })
+            body: JSON.stringify({ idToken }),
+            credentials: 'same-origin'
         });
 
+        console.log('Login debug: /api/auth/login status =', response.status);
+
+        const payload = await response.json().catch(() => ({}));
+        console.log('Login debug: /api/auth/login payload =', payload);
+
         if (response.ok) {
-            console.log('Backend login successful, redirecting to dashboard...');
+            const sessionProbe = await fetch('/api/auth/status', { credentials: 'same-origin' });
+            console.log('Login debug: /api/auth/status after login =', sessionProbe.status);
             window.location.href = '/admin/dashboard.html';
         } else {
-            const error = await response.json();
-            errorElement.innerText = error.message || 'Admin verification failed.';
+            errorElement.innerText = payload.message || 'Admin verification failed.';
             errorElement.style.display = 'block';
         }
     } catch (error) {
+        console.error('Login debug: completeLogin exception =', error);
         errorElement.innerText = 'An error occurred during login. Please try again.';
         errorElement.style.display = 'block';
     }
