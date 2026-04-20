@@ -17,12 +17,9 @@
             <div class="sidebar-heading text-white">AquaScan Admin</div>
             <div class="list-group list-group-flush">
                 <a href="dashboard.html" class="list-group-item list-group-item-action bg-dark text-white">Dashboard</a>
+                <a href="users.html" class="list-group-item list-group-item-action bg-dark text-white">User Activity</a>
                 <a href="scans.html" class="list-group-item list-group-item-action bg-dark text-white active">Scan Records</a>
                 <a href="fishfreshness.html" class="list-group-item list-group-item-action bg-dark text-white">Fish Freshness</a>
-                <a href="dataset.html" class="list-group-item list-group-item-action bg-dark text-white">Image Dataset</a>
-                <a href="users.html" class="list-group-item list-group-item-action bg-dark text-white">Users</a>
-                <a href="training-data.html" class="list-group-item list-group-item-action bg-dark text-white">Model Training Data</a>
-                <a href="model-status.html" class="list-group-item list-group-item-action bg-dark text-white">Model Status</a>
                 <a href="analytics.html" class="list-group-item list-group-item-action bg-dark text-white">Analytics</a>
                 <a href="system-logs.html" class="list-group-item list-group-item-action bg-dark text-white">System Logs</a>
                 <a href="settings.html" class="list-group-item list-group-item-action bg-dark text-white">Settings</a>
@@ -69,7 +66,8 @@
                                 <select id="freshness-filter" class="form-select">
                                     <option value="">All Freshness</option>
                                     <option value="fresh">Fresh</option>
-                                    <option value="not_fresh">Not Fresh</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="spoiled">Spoiled</option>
                                 </select>
                             </div>
                             <div class="col-md-2">

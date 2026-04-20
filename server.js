@@ -269,14 +269,15 @@ const getTrainingDataStats = async () => {
     };
 };
 
-const getScansQuery = () => db.collectionGroup('scans');
+const getScansQuery = () => db.collection('scans');
 
 const normalizeFreshness = (value) => {
     if (!value || typeof value !== 'string') return null;
 
     const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, '_');
     if (normalized === 'fresh') return 'fresh';
-    if (['not_fresh', 'notfresh', 'stale', 'spoiled'].includes(normalized)) return 'not_fresh';
+    if (['medium', 'medium_fresh', 'mediumfresh'].includes(normalized)) return 'medium';
+    if (['not_fresh', 'notfresh', 'stale', 'spoiled'].includes(normalized)) return 'spoiled';
 
     return normalized;
 };
@@ -351,7 +352,7 @@ const getDashboardStats = async () => {
     const today = new Date().toDateString();
 
     scans.forEach((scan) => {
-        if (scan.freshness === 'fresh' || scan.freshness === 'not_fresh') {
+        if (scan.freshness === 'fresh' || scan.freshness === 'medium' || scan.freshness === 'spoiled') {
             freshnessIdentified++;
         }
 
@@ -628,14 +629,16 @@ app.get("/api/fishfreshness", async (req, res) => {
   try {
     const scans = await getNormalizedScans();
     let freshCount = 0;
-    let notFreshCount = 0;
+    let mediumCount = 0;
+    let spoiledCount = 0;
 
     scans.forEach((scan) => {
       if (scan.freshness === 'fresh') freshCount++;
-      if (scan.freshness === 'not_fresh') notFreshCount++;
+      if (scan.freshness === 'medium') mediumCount++;
+      if (scan.freshness === 'spoiled') spoiledCount++;
     });
 
-    res.json({ freshCount, notFreshCount });
+    res.json({ freshCount, mediumCount, spoiledCount });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -27,12 +27,13 @@ function renderScanRow(scan) {
     const uploadDate = scan.uploadDate && scan.uploadDate._seconds ? new Date(scan.uploadDate._seconds * 1000).toLocaleString() : 'N/A';
     return `
         <tr>
-            <td>${scan.id}</td>
+            <td>${scan.id || "N/A"}</td>
             <td>${scan.userName || "Unknown User"}</td>
-            <td><img src="${scan.imageUrl || ''}" alt="Scan preview" width="60" style="object-fit: cover; height: 40px;" onerror="this.style.display='none'"></td>
+            <td>${scan.species || "N/A"}</td>
             <td>${scan.freshness || "N/A"}</td>
             <td>${scan.confidence ? (scan.confidence * 100).toFixed(1) + '%' : 'N/A'}</td>
             <td>${uploadDate}</td>
+            <td><img src="${scan.imageUrl || ''}" alt="Scan preview" width="60" style="object-fit: cover; height: 40px; border-radius: 4px;" onerror="this.style.display='none'"></td>
             <td><span class="badge bg-success">${scan.status || 'Verified'}</span></td>
         </tr>
     `;

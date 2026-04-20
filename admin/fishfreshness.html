@@ -14,12 +14,9 @@
             <div class="sidebar-heading text-white">AquaScan Admin</div>
             <div class="list-group list-group-flush">
                 <a href="dashboard.html" class="list-group-item list-group-item-action bg-dark text-white">Dashboard</a>
+                <a href="users.html" class="list-group-item list-group-item-action bg-dark text-white">User Activity</a>
                 <a href="scans.html" class="list-group-item list-group-item-action bg-dark text-white">Scan Records</a>
                 <a href="fishfreshness.html" class="list-group-item list-group-item-action bg-dark text-white active">Fish Freshness</a>
-                <a href="dataset.html" class="list-group-item list-group-item-action bg-dark text-white">Image Dataset</a>
-                <a href="users.html" class="list-group-item list-group-item-action bg-dark text-white">Users</a>
-                <a href="training-data.html" class="list-group-item list-group-item-action bg-dark text-white">Model Training Data</a>
-                <a href="model-status.html" class="list-group-item list-group-item-action bg-dark text-white">Model Status</a>
                 <a href="analytics.html" class="list-group-item list-group-item-action bg-dark text-white">Analytics</a>
                 <a href="system-logs.html" class="list-group-item list-group-item-action bg-dark text-white">System Logs</a>
                 <a href="settings.html" class="list-group-item list-group-item-action bg-dark text-white">Settings</a>
@@ -54,7 +51,7 @@
 
                 <!-- Stats Cards -->
                 <div class="row">
-                    <div class="col-lg-6 mb-4">
+                    <div class="col-lg-4 mb-4">
                         <div class="card text-white bg-success h-100">
                             <div class="card-body">
                                 <h5 class="card-title">Total Fresh</h5>
@@ -62,11 +59,19 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-6 mb-4">
+                    <div class="col-lg-4 mb-4">
+                        <div class="card text-white h-100" style="background-color: #fd7e14;">
+                            <div class="card-body">
+                                <h5 class="card-title">Total Medium</h5>
+                                <p class="card-text fs-4" id="total-medium">0</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 mb-4">
                         <div class="card text-white bg-danger h-100">
                             <div class="card-body">
-                                <h5 class="card-title">Total Not Fresh</h5>
-                                <p class="card-text fs-4" id="total-not-fresh">0</p>
+                                <h5 class="card-title">Total Spoiled</h5>
+                                <p class="card-text fs-4" id="total-spoiled">0</p>
                             </div>
                         </div>
                     </div>

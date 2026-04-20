@@ -17,12 +17,9 @@
             <div class="sidebar-heading text-white">AquaScan Admin</div>
             <div class="list-group list-group-flush">
                 <a href="dashboard.html" class="list-group-item list-group-item-action bg-dark text-white active">Dashboard</a>
+                <a href="users.html" class="list-group-item list-group-item-action bg-dark text-white">User Activity</a>
                 <a href="scans.html" class="list-group-item list-group-item-action bg-dark text-white">Scan Records</a>
                 <a href="fishfreshness.html" class="list-group-item list-group-item-action bg-dark text-white">Fish Freshness</a>
-                <a href="dataset.html" class="list-group-item list-group-item-action bg-dark text-white">Image Dataset</a>
-                <a href="users.html" class="list-group-item list-group-item-action bg-dark text-white">Users</a>
-                <a href="training-data.html" class="list-group-item list-group-item-action bg-dark text-white">Model Training Data</a>
-                <a href="model-status.html" class="list-group-item list-group-item-action bg-dark text-white">Model Status</a>
                 <a href="analytics.html" class="list-group-item list-group-item-action bg-dark text-white">Analytics</a>
                 <a href="system-logs.html" class="list-group-item list-group-item-action bg-dark text-white">System Logs</a>
                 <a href="settings.html" class="list-group-item list-group-item-action bg-dark text-white">Settings</a>
@@ -56,15 +53,7 @@
                 <h1 class="mt-4">Dashboard</h1>
                 <!-- Top Metrics Cards -->
                 <div class="row">
-                    <div class="col-lg-3 col-md-6 mb-4">
-                        <div class="card text-white bg-info h-100">
-                            <div class="card-body">
-                                <h5 class="card-title">Dataset Size</h5>
-                                <p class="card-text fs-4" id="dataset-size">0</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="col-lg-4 col-md-6 mb-4">
                         <div class="card text-white bg-primary h-100">
                             <div class="card-body">
                                 <h5 class="card-title">Total Scans</h5>
@@ -72,7 +61,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="col-lg-4 col-md-6 mb-4">
                         <div class="card text-white h-100" style="background-color: #20c997;">
                             <div class="card-body">
                                 <h5 class="card-title">Registered Users</h5>
@@ -80,16 +69,16 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6 mb-4">
-                        <div class="card text-dark bg-light h-100">
+                    <div class="col-lg-4 col-md-6 mb-4">
+                        <div class="card text-white bg-success h-100">
                             <div class="card-body">
                                 <h5 class="card-title">Fish Freshness Identified</h5>
                                 <p class="card-text fs-4" id="fish-freshness-identified">0</p>
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-3 col-md-6 mb-4">
-                        <div class="card text-dark bg-light h-100">
+                    <div class="col-lg-4 col-md-6 mb-4">
+                        <div class="card text-white bg-info h-100">
                             <div class="card-body">
                                 <h5 class="card-title">New Scans Today</h5>
                                 <p class="card-text fs-4" id="new-scans-today">0</p>

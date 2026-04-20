@@ -12,7 +12,8 @@ async function loadFreshnessData() {
         const summaryRes = await fetch('/api/fishfreshness');
         const summaryData = await summaryRes.json();
         document.getElementById('total-fresh').innerText = summaryData.freshCount || 0;
-        document.getElementById('total-not-fresh').innerText = summaryData.notFreshCount || 0;
+        document.getElementById('total-medium').innerText = summaryData.mediumCount || 0;
+        document.getElementById('total-spoiled').innerText = summaryData.spoiledCount || 0;
 
         // Render chart
         const ctx = document.getElementById('freshness-distribution-chart').getContext('2d');
@@ -22,17 +23,17 @@ async function loadFreshnessData() {
         freshnessDistributionChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels: ['Fresh', 'Not Fresh'],
+                labels: ['Fresh', 'Medium', 'Spoiled'],
                 datasets: [{
                     label: 'Freshness Distribution',
-                    data: [summaryData.freshCount, summaryData.notFreshCount],
-                    backgroundColor: ['#28a745', '#dc3545'],
+                    data: [summaryData.freshCount, summaryData.mediumCount, summaryData.spoiledCount],
+                    backgroundColor: ['#28a745', '#fd7e14', '#dc3545'],
                 }]
             }
         });
 
         // Fetch recent checks for the table
-        const scansRes = await fetch('/api/scans?limit=10&sortOrder=desc&freshness=fresh,not_fresh');
+        const scansRes = await fetch('/api/scans?limit=10&sortOrder=desc&freshness=fresh,medium,spoiled');
         const { scans } = await scansRes.json();
         const tableBody = document.getElementById('recent-checks-table-body');
 
